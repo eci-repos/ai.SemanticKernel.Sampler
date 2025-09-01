@@ -1,0 +1,19 @@
+﻿{
+   "schema": 1,
+   "type": "completion",
+   "description": "Extracts key points from text as bullet points",
+   "completion": {
+      "max_tokens": 300,
+      "temperature": 0.2,
+      "top_p": 0.9
+   },
+   "input": {
+      "parameters": [
+         {
+            "name": "input",
+            "description": "The text from which to extract key points",
+            "defaultValue": ""
+         }
+      ]
+   }
+}

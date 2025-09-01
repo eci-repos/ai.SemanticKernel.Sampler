@@ -1,0 +1,19 @@
+﻿{
+   "schema": 1,
+   "type": "completion",
+   "description": "Analyzes text sentiment and provides classification with reasoning",
+   "completion": {
+      "max_tokens": 150,
+      "temperature": 0.1,
+      "top_p": 0.9
+   },
+   "input": {
+      "parameters": [
+         {
+            "name": "input",
+            "description": "The text to analyze for sentiment",
+            "defaultValue": ""
+         }
+      ]
+   }
+}

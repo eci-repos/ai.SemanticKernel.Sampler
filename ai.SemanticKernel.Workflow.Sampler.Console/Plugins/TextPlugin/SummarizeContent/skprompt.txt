@@ -1,0 +1,11 @@
+﻿Summarize the following text concisely while preserving key information and main ideas.
+
+Text: {{$input}}
+
+Summary Requirements:
+- Length: 3-5 sentences maximum
+- Focus on main points and key details
+- Maintain original meaning and context
+- Use clear, concise language
+
+Summary:

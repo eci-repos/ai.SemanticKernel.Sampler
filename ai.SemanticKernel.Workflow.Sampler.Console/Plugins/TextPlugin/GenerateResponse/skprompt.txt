@@ -1,0 +1,13 @@
+﻿Based on the detected sentiment and user input, generate an appropriate response.
+
+User Input: {{$input}}
+Detected Sentiment: {{$sentiment}}
+
+Guidelines:
+- If sentiment is Positive: Be enthusiastic and encouraging
+- If sentiment is Negative: Be empathetic and supportive  
+- If sentiment is Neutral: Be professional and helpful
+
+Response should be concise (1-2 paragraphs) and address the user's input appropriately.
+
+Response:

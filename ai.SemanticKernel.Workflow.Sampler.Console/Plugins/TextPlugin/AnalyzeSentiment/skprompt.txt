@@ -1,0 +1,10 @@
+﻿Analyze the sentiment of the following text and classify it as Positive, Negative, or Neutral.
+
+Text: {{$input}}
+
+Provide your analysis in the following format:
+Sentiment: [Positive/Negative/Neutral]
+Confidence: [High/Medium/Low]
+Reasoning: [Brief explanation]
+
+Analysis:

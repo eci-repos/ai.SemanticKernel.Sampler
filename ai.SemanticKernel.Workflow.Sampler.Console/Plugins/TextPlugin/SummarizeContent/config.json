@@ -1,0 +1,19 @@
+﻿{
+   "schema": 1,
+   "type": "completion",
+   "description": "Creates concise summaries of text content",
+   "completion": {
+      "max_tokens": 250,
+      "temperature": 0.3,
+      "top_p": 0.9
+   },
+   "input": {
+      "parameters": [
+         {
+            "name": "input",
+            "description": "The text content to summarize",
+            "defaultValue": ""
+         }
+      ]
+   }
+}

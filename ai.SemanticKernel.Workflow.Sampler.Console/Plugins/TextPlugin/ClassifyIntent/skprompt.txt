@@ -1,0 +1,18 @@
+﻿Classify the intent of the user's message into one of the following categories:
+
+Available Categories:
+- question: User is asking a question
+- request: User is making a request
+- feedback: User is providing feedback
+- complaint: User is expressing a complaint
+- greeting: User is greeting or being social
+- unknown: Cannot determine or doesn't fit other categories
+
+User Input: {{$input}}
+
+Provide your classification in the following format:
+Intent: [category]
+Confidence: [High/Medium/Low]
+Reasoning: [Brief explanation]
+
+Classification:
