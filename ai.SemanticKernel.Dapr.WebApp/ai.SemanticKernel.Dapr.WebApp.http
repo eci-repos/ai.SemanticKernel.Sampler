@@ -1,0 +1,6 @@
+@ai.SemanticKernel.Dapr.WebApp_HostAddress = http://localhost:5190
+
+GET {{ai.SemanticKernel.Dapr.WebApp_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

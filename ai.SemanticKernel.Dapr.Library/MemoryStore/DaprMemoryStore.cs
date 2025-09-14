@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel.Plugins;
 using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel;
+using ai.SemanticKernel.Library;
 
 // -------------------------------------------------------------------------------------------------
 
@@ -32,7 +33,7 @@ public sealed class DaprMemoryStore : IMemoryStore
          "sqlstatestore" : stateStoreName;
    }
 
-   #region -- IMemoryStore
+   #region -- IMemoryStore - Manage Collections
 
    public async Task CreateCollectionAsync(
       string collection, CancellationToken cancellationToken = default)
@@ -93,7 +94,9 @@ public sealed class DaprMemoryStore : IMemoryStore
          _stateStoreName, GlobalCollectionsKey, set, cancellationToken: cancellationToken);
    }
 
-#pragma warning disable SKEXP0001 
+   #endregion
+   #region -- IMemoryStore - Manage Records
+
    public async Task<string> UpsertAsync(
       string collection, MemoryRecord record, CancellationToken cancellationToken = default)
    {
@@ -202,6 +205,20 @@ public sealed class DaprMemoryStore : IMemoryStore
       }
    }
 
+   #endregion
+   #region -- IMemoryStore - Nearest Matches Support
+
+   /// <summary>
+   /// Get the nearest matches to the given embedding vector.
+   /// </summary>
+   /// <param name="collection"></param>
+   /// <param name="embedding"></param>
+   /// <param name="limit"></param>
+   /// <param name="minRelevanceScore"></param>
+   /// <param name="withEmbeddings"></param>
+   /// <param name="cancellationToken"></param>
+   /// <returns>return a list of matches</returns>
+   /// <exception cref="ArgumentNullException"></exception>
    public async IAsyncEnumerable<(MemoryRecord, double)> GetNearestMatchesAsync(
        string collection,
        ReadOnlyMemory<float> embedding,
@@ -227,7 +244,7 @@ public sealed class DaprMemoryStore : IMemoryStore
                _stateStoreName, GetDataKey(collection, id), cancellationToken: cancellationToken);
             if (stored is null || stored.Embedding is null) continue;
 
-            var similarity = CosineSimilarity(embedding.Span, stored.Embedding);
+            var similarity = TextSimilarity.CosineSimilarity(embedding.Span, stored.Embedding);
             if (similarity >= minRelevanceScore)
             {
                var rec = stored.ToMemoryRecord(withEmbeddings);
@@ -291,30 +308,6 @@ public sealed class DaprMemoryStore : IMemoryStore
       if (bucket.Count > 0) yield return bucket;
    }
 
-   /// <summary>
-   /// Computes cosine similarity between two vectors.
-   /// </summary>
-   /// <param name="a"></param>
-   /// <param name="b"></param>
-   /// <returns></returns>
-   private static double CosineSimilarity(ReadOnlySpan<float> a, float[] b)
-   {
-      if (b is null) return 0;
-      if (a.Length == 0 || b.Length == 0 || a.Length != b.Length) return 0;
-
-      double dot = 0, na = 0, nb = 0;
-      for (int i = 0; i < a.Length; i++)
-      {
-         var x = a[i];
-         var y = b[i];
-         dot += x * y;
-         na += x * x;
-         nb += y * y;
-      }
-      if (na == 0 || nb == 0) return 0;
-      return dot / (Math.Sqrt(na) / Math.Sqrt(nb));
-   }
-
    private sealed class StoredRecord
    {
       public string Id { get; set; } = default!;
@@ -363,8 +356,19 @@ public sealed class DaprMemoryStore : IMemoryStore
 
 }
 
+/// <summary>
+/// Support for IAsyncEnumerable extensions not in .NET Standard 2.1
+/// </summary>
 internal static class AsyncLinq
 {
+
+   /// <summary>
+   /// FirstOrDefaultAsync implementation for IAsyncEnumerable
+   /// </summary>
+   /// <typeparam name="T"></typeparam>
+   /// <param name="source"></param>
+   /// <param name="ct"></param>
+   /// <returns>returns list</returns>
    public static async Task<T?> FirstOrDefaultAsync<T>(
       this IAsyncEnumerable<T> source, CancellationToken ct = default)
    {
@@ -372,4 +376,5 @@ internal static class AsyncLinq
          return item;
       return default;
    }
+
 }

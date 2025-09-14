@@ -36,7 +36,9 @@ public class ChatPlugin
          throw new ArgumentNullException(nameof(kernel));
 
       // Create Dapr client
-      var daprClient = new DaprClientBuilder().Build();
+      var daprClient = new DaprClientBuilder()
+         .UseGrpcEndpoint("http://localhost:50001")
+         .Build();
 
       // Get chat completion service from kernel
       var chatCompletionService = kernel.GetRequiredService<IChatCompletionService>();
@@ -51,8 +53,15 @@ public class ChatPlugin
    }
 
    #endregion
-   #region -- Chat History Model
+   #region -- Chat with History
 
+   /// <summary>
+   /// 
+   /// </summary>
+   /// <param name="userMessage"></param>
+   /// <param name="userId"></param>
+   /// <param name="cancellationToken"></param>
+   /// <returns></returns>
    [KernelFunction]
    [Description("Sends a message to the chat and gets a response. Maintains conversation history.")]
    public async Task<string> ChatAsync(
@@ -106,6 +115,12 @@ public class ChatPlugin
       return $"Conversation History:\n{historyText}";
    }
 
+   /// <summary>
+   /// Load chat history for a specific user.
+   /// </summary>
+   /// <param name="userId">user id</param>
+   /// <param name="cancellationToken">cancellation token</param>
+   /// <returns>Chat history is returned</returns>
    private async Task<ChatHistory> LoadChatHistoryAsync(
       string userId, CancellationToken cancellationToken)
    {

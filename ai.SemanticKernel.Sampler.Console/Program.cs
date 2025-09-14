@@ -13,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using ai.SemanticKernel.Sampler.Console.DistributedAppRuntime;
 
 // -------------------------------------------------------------------------------------------------
 // - Note that the following is not needed for some of the examples...

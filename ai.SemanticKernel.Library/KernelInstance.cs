@@ -31,7 +31,7 @@ public class KernelInstance
    }
 
    /// <summary>
-   /// 
+   /// Kernel instance constructor.
    /// </summary>
    /// <param name="config">configuration/settings based on KernelModelConfig</param>
    public KernelInstance(object config)
@@ -99,3 +99,4 @@ public class KernelInstance
    }
 
 }
+
