@@ -27,7 +27,7 @@ public class ChatService
       _kernel = kernelInstance.Instance;
 
       // Register the ChatPlugin
-      var chatPlugin = ChatPlugin.RegisterPlugin(_kernel, "statestore");
+      var chatPlugin = ChatPlugin.RegisterPlugin(_kernel, "sqlstatestore");
 
       // Get the plugin functions
       _chatFunction = chatPlugin["Chat"];

@@ -45,11 +45,53 @@ The primary benefits include:
 
 In essence, Dapr handles the complex, distributed systems problems, allowing developers to focus on the AI logic and prompt engineering within Semantic Kernel.
 
-## Dapr Setup
+## Verify Chat History Persistence
+After running the console app and having a conversation, you can verify that the chat history has been persisted in your SQL Server database. You can do this by querying the `sk_state` table that Dapr uses to store state information.
+
+# SK & Dapr Sample Code
+The sample code demonstrates how to implement a custom memory store and a chat plugin using Dapr's state management capabilities with SQL Server as the backend.
+Before you run the code make sure that you have Dapr installed and running in your environment (see Dapr Setup section ahead for details).  First run Dapr sidecar and then run the console app or web app.
+
+## Running the Sample Console App
+Within the Sampler Console find the DaprChatWithHistory.RunAsync() invocation and undocument it as needed.
+
+### Semantic Kernel flow (console)
+
+- First, construct a Kernel with a chat completion service (model config). In your web example this is wrapped in a ChatService(new KernelModelConfig()); a console host would do the same initialization and then call the same service methods directly. 
+- The ChatPlugin is registered against that Kernel. It internally creates a DaprClient, resolves the Kernel’s IChatCompletionService, and is imported as a Kernel plugin (so you can call its functions from your own code). The plugin’s state store name defaults to "statestore" but can be overridden. 
+- When calling ChatAsync(userMessage, userId) from your console loop, it:
+
+  - loads prior history from Dapr (LoadChatHistoryAsync),
+  - appends the user message,
+  - calls the model via GetChatMessageContentAsync(chatHistory, …),
+  - appends the assistant reply, and
+  - persists the updated history back to Dapr. It returns the assistant text for you to print to the console.
+
+- For tooling, the plugin also exposes GetHistoryAsync(userId) (returns a formatted transcript) and ClearHistoryAsync(userId) (deletes persisted history). Your console host can wire these to commands like /history and /clear. 
+
+### Dapr state and sidecar (console)
+
+- All history I/O is through the Dapr sidecar using DaprClient and your chosen state store name (_storeName, default "statestore"). Keys are "chat-history-{userId}". Reads fall back to empty history if they fail; saves/deletes use the same name, so the component name must match (e.g., a component with metadata.name: statestore). 
+- In a console run, you start the sidecar (dapr run … or dapr sidecar …) and then run your console process. The plugin’s DaprClient talks gRPC to the sidecar; ensure the gRPC port is reachable and matches your environment. (Your web sample shows the same dependency but hosted in ASP.NET; the console version keeps the same client calls.) 
+
+### Optional SK memory via Dapr
+
+- Also an IMemoryStore backed by Dapr was implemented, defaulting to "sqlstatestore". It namespaces keys as {collection}:{id} and maintains a simple per-collection index plus a global collections set—all persisted via Dapr state APIs. A console host can new up DaprMemoryStore and plug it into SK memory the same way as the web. 
+
+- ### Putting it together (console host shape)
+
+1. Build Kernel + model, register ChatPlugin (optionally pass your store name). 
+2. In a read–eval–print loop, call:
+   - ChatAsync(msg, userId) → print reply; persisted automatically,
+   - GetHistoryAsync(userId) → print transcript,
+   - ClearHistoryAsync(userId) → acknowledge cleared. 
+3. Ensure your Dapr component’s metadata.name matches the store the plugin/memory store expects (statestore vs sqlstatestore) so GetStateAsync/SaveStateAsync/DeleteStateAsync succeed.
+
+# Dapr Setup
 To use the Dapr integration with Semantic Kernel, ensure you have Dapr installed and running 
 in your environment. You can follow the official Dapr installation guide [here](https://docs.dapr.io/getting-started/).
 
-### Dapr SQL Server as the State Store
+## Dapr SQL Server as the State Store
 To use the Dapr SQL State Store with Semantic Kernel, you need to configure the state store in your Dapr components.
 Within your Dapr components directory, create a file named `sqlserver-statestore.yaml` with the following content:
 
@@ -79,10 +121,21 @@ spec:
 ```
 
 Make sure to replace the connection string with your actual SQL Server connection details also make sure that the "sql_db" exists
-and the "sk_user" account has the necessary permissions; then run the following:
+and the "sk_user" account has the necessary permissions; then to start Dapr run the following:
 
 ```
-dapr run --app-id sk-app --resources-path ./components -- dotnet run
+dapr run --app-id sk-app --dapr-grpc-port 50001 --dapr-http-port 3500 --resources-path ./components
 ```
 
 Upon successful execution, you should see the "dapr.dapr_metadata" and the "sk_state" tables created in your SQL Server database.
+
+Verify that the Dapr sidecar is running by executing:
+```
+# Should return metadata; confirms the sidecar and HTTP port
+Invoke-RestMethod http://localhost:3500/v1.0/metadata
+```
+
+### Debugging Dapr Applications
+Note that to start Dapr sidecar without running your app just use the above command without the `-- dotnet run` part.
+This is useful for debugging Dapr applications in isolation and you can then debug your .NET app separately in Visual Studio.
+

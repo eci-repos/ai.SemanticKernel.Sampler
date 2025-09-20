@@ -55,7 +55,10 @@ var builder = Host.CreateApplicationBuilder(args);
 //await HandlebarsTemplating.ComplexTemplate();
 
 // [RAG Text Search Enhanced] - Activity Text Search Sample
-await ActivityTextSearchSample.RunAsync();
+//await ActivityTextSearchSample.RunAsync();
+
+// [Dapr Integration] - Build Web Dapr Application
+await DaprChatWithHistory.RunAsync();
 
 // -------------------------------------------------------------------
 // - Note that the following is not needed for some of the examples...

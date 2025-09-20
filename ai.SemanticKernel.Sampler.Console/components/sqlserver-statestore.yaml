@@ -1,0 +1,22 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: sqlstatestore
+spec:
+  type: state.sqlserver
+  version: v1
+  metadata:
+  - name: connectionString
+    value: "Server=localhost,1433;Database=sk_db;User Id=sk_user;Password=YourStrong@Passw0rd;Encrypt=false;TrustServerCertificate=true;"
+  - name: tableName
+    value: "sk_state"
+  - name: schema
+    value: "dapr"
+  - name: keyType
+    value: "string"     # string | uuid | integer
+  - name: keyLength
+    value: "200"        # only applies to keyType=string
+  - name: indexedProperties
+    value: ""           # JSON string to create extra indexed columns
+  - name: cleanupIntervalInSeconds
+    value: "3600"       # TTL garbage-collector interval

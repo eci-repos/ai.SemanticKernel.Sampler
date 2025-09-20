@@ -35,7 +35,7 @@ public class ChatPlugin
       if (kernel == null)
          throw new ArgumentNullException(nameof(kernel));
 
-      // Create Dapr client
+      // Create Dapr client using GRPC endpoint
       var daprClient = new DaprClientBuilder()
          .UseGrpcEndpoint("http://localhost:50001")
          .Build();
