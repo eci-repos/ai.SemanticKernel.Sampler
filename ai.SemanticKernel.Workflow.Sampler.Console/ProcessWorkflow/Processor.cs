@@ -13,16 +13,16 @@ namespace ai.SemanticKernel.Workflow.Sampler.Console.ProcessWorkflow;
 public class Processor
 {
 
-   private KernelInstance _kernelInstance;
+   private KernelHost _kernelInstance;
 
    public Kernel Kernel
    {
       get { return _kernelInstance.Instance; }
    }
 
-   public static KernelModelConfig GetConfig()
+   public static KernelConfig GetConfig()
    {
-      var config = new KernelModelConfig();
+      var config = new KernelConfig();
       return config;
    }
 
@@ -31,14 +31,14 @@ public class Processor
    /// </summary>
    /// <param name="config"></param>
    /// <returns>A Kernel instance is returned</returns>
-   public Kernel PrepareKernel(KernelModelConfig? config = null)
+   public Kernel PrepareKernel(KernelConfig? config = null)
    {
       if (config == null)
       {
          config = GetConfig();
       }
 
-      _kernelInstance = new KernelInstance(config);
+      _kernelInstance = new KernelHost(config);
 
       return Kernel;
    }

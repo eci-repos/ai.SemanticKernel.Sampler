@@ -16,7 +16,7 @@ public class DaprChatWithHistory
    public static async Task RunAsync()
    {
       System.Console.WriteLine("Dapr Chat with History sample.");
-      ChatService chatService = new ChatService(new KernelModelConfig());
+      ChatService chatService = new ChatService(new KernelConfig());
       var result = await chatService.SendMessageAsync(
          "user1", "What is the main purpose of AI Semantic Search in a database?");
    }

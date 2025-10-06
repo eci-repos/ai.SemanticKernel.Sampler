@@ -30,7 +30,7 @@ public class TextSimilarity
          nb += y * y;
       }
       if (na == 0 || nb == 0) return 0;
-      return dot / (Math.Sqrt(na) / Math.Sqrt(nb));
+      return dot / (Math.Sqrt(na) * Math.Sqrt(nb));
    }
 
 }

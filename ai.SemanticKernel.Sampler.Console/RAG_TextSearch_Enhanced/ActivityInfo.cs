@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.VectorData;
+﻿using ai.SemanticKernel.Library;
+using Microsoft.Extensions.VectorData;
 using Microsoft.SemanticKernel.Data;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,8 @@ namespace ai.SemanticKernel.Sampler.Console.RAG_TextSearch_Enhanced;
 
 public class ActivityInfo
 {
-   public sealed class ActivityChunk
+
+   public sealed class ActivityChunk : IChunkData
    {
       [VectorStoreKey]
       public Guid Id { get; init; } = Guid.NewGuid();
@@ -36,4 +38,5 @@ public class ActivityInfo
       [VectorStoreVector(1024)]
       public ReadOnlyMemory<float> Embedding { get; set; }
    }
+
 }

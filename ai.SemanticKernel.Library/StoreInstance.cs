@@ -15,7 +15,7 @@ public class StoreInstance
 {
 
    private QdrantVectorStore? _vectorStore;
-   private KernelInstance _kernelInstance;
+   private KernelHost _kernelInstance;
 
    public Kernel Kernel
    {
@@ -45,7 +45,7 @@ public class StoreInstance
    /// Initialize Memory Store.
    /// </summary>
    /// <param name="kernel"></param>
-   public StoreInstance(KernelInstance kernel)
+   public StoreInstance(KernelHost kernel)
    {
       _kernelInstance = kernel;
    }
@@ -62,7 +62,7 @@ public class StoreInstance
    /// the vector store.</param>
    /// <returns>A new instance of <see cref="QdrantVectorStore"/> configured with the necessary 
    /// embedding generator and client options.</returns>
-   public QdrantVectorStore PrepareVectorStore(KernelModelConfig config)
+   public QdrantVectorStore PrepareVectorStore(KernelConfig config)
    {
       // Configure Qdrant Vector Store and let it auto-embed via the generator
       _vectorStore = new QdrantVectorStore(

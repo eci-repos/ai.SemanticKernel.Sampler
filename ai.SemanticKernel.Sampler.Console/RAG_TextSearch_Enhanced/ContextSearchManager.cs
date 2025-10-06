@@ -16,7 +16,7 @@ namespace ai.SemanticKernel.Sampler.Console.RAG_TextSearch_Enhanced;
 
 public class ContextSearchManager
 {
-   private KernelInstance _kernelInstance;
+   private KernelHost _kernelInstance;
    private readonly ContextManagerConfig _config;
    private Kernel _kernel
    {
@@ -36,7 +36,7 @@ public class ContextSearchManager
    public ContextSearchManager(ContextManagerConfig config)
    {
       _config = config;
-      _kernelInstance = new KernelInstance(config);
+      _kernelInstance = new KernelHost(config);
    }
 
    /// <summary>
@@ -73,12 +73,12 @@ public class ContextSearchManager
          _kernel.GetRequiredService<IEmbeddingGenerator<string, Embedding<float>>>();
       var chunks = ActivityTextChuncker.BuildChunks(corpus).ToList();
 
-      var texts = chunks.Select(c => c.Text).ToList();
+      //var texts = chunks.Select(c => c.Text).ToList();
+      var textChunks = chunks.Select(c => c.Text).Where(t => !string.IsNullOrWhiteSpace(t));
 
       // Generate embeddings
       var gen = await embeddingGenerator.GenerateAsync(
-          chunks.Select(c => c.Text).Where(t => !string.IsNullOrWhiteSpace(t)),
-          new EmbeddingGenerationOptions { ModelId = _config.EmbeddingModel }
+          textChunks, new EmbeddingGenerationOptions { ModelId = _config.EmbeddingModel }
       );
       for (int i = 0; i < chunks.Count; i++)
       {
