@@ -18,6 +18,7 @@ public class KernelIO : IKernelIO
 
    public static IKernelIO Console => _console;
    public static IKernelIO Error => _error;
+   public static IKernelIO Log => _error;
 
    public KernelIO()
    {

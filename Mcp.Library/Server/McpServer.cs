@@ -1,4 +1,7 @@
 ﻿using Mcp.Library.Models;
+using ai.SemanticKernel.Library;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -6,26 +9,17 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 
 // -------------------------------------------------------------------------------------------------
 namespace Mcp.Library.Server;
 
-/// <summary>
-/// Represents a server that processes JSON-RPC 2.0 messages over standard input and output.
-/// </summary>
-/// <remarks>The <see cref="McpServer"/> class is designed to handle JSON-RPC 2.0 communication 
-/// using a framing protocol over standard input and output streams. It supports asynchronous 
-/// processing of incoming requests and provides responses based on the registered tools and server
-/// capabilities. <para> Typical usage involves creating an instance of <see cref="McpServer"/> 
-/// with the required JSON serialization options and tool registry, and then calling 
-/// <see cref="RunAsync"/> to start processing messages. </para>
-/// <para> This class is thread-safe for concurrent use, as each incoming request is processed in 
-/// a separate task. </para>
-/// </remarks>
+
 public sealed class McpServer
 {
    private readonly JsonSerializerOptions _jsonSerializerOptions;
    private readonly ToolRegistry _registry;
+   public KernelHost _kernelHost;
 
    /// <summary>
    /// Initializes a new instance of the <see cref="McpServer"/> class with the specified JSON 
@@ -33,69 +27,80 @@ public sealed class McpServer
    /// </summary>
    /// <remarks>Use this constructor to create an instance of <see cref="McpServer"/> with custom 
    /// serialization settings and a specific tool registry.</remarks>
-   /// <param name="json">The <see cref="JsonSerializerOptions"/> used to configure JSON 
-   /// serialization and deserialization.</param>
+   /// <param name="kernelHost">The <see cref="KernelHost"/> that provides access to the semantic
+   /// </param>
+   /// <param name="jsonSerializerOptions">The <see cref="JsonSerializerOptions"/> used to configure
+   /// JSON serialization and deserialization.</param>
    /// <param name="registry">The <see cref="ToolRegistry"/> that provides access to registered 
    /// tools.</param>
-   public McpServer(JsonSerializerOptions json, ToolRegistry registry)
+   public McpServer(
+      KernelHost kernelHost, JsonSerializerOptions jsonSerializerOptions, ToolRegistry registry)
    { 
-      _jsonSerializerOptions = json; 
+      _kernelHost = kernelHost;
+      _jsonSerializerOptions = jsonSerializerOptions; 
       _registry = registry; 
    }
 
-   /// <summary>
-   /// Processes JSON-RPC 2.0 messages over standard input and output asynchronously.
-   /// </summary>
-   /// <remarks>This method reads JSON-RPC frames from the standard input stream, processes each 
-   /// request, and writes the corresponding response to the standard output stream. It uses a 
-   /// framing protocol where each message is prefixed with a "Content-Length" header. The method 
-   /// runs continuously until the provided <see cref="CancellationToken"/> signals cancellation 
-   /// or the input stream reaches the end of file (EOF).  Each request is handled in a separate 
-   /// task to ensure concurrent processing. If an error occurs while processing a request, an
-   /// appropriate JSON-RPC error response is generated and sent back to the client.</remarks>
-   /// <param name="ct">A <see cref="CancellationToken"/> that can be used to cancel the operation.
-   /// The default value is <see cref="CancellationToken.None"/>.</param>
-   /// <returns>A <see cref="Task"/> that represents the asynchronous operation. The task completes
-   /// when the method stops processing due to cancellation or EOF.</returns>
-   public async Task RunAsync(CancellationToken ct = default)
+   // STDIO single-session
+   public async Task RunStdIoAsync(CancellationToken ct = default)
    {
-      // Read JSON-RPC frames from stdin, write to stdout.
-      // MCP typically uses JSON-RPC 2.0 over stdio with header framing:
-      // Content-Length\r\n\r\n<body>
-      var reader = new StreamReader(
-         Console.OpenStandardInput(), Console.InputEncoding, false, 8192, true);
-      var writer = new StreamWriter(
-         Console.OpenStandardOutput(), Console.OutputEncoding, 8192, true) { AutoFlush = true };
+      try
+      {
+         using var reader = new StreamReader(
+            Console.OpenStandardInput(), Console.InputEncoding, false, 8192, true);
+         using var writer = new StreamWriter(
+            Console.OpenStandardOutput(), Console.OutputEncoding, 8192, true)
+         { AutoFlush = true };
 
+         KernelIO.Error.WriteLine("[server] Listening...");
+         await RunLoopAsync(reader, writer, ct);
+      }
+      catch(Exception ex)
+      {
+         KernelIO.Error.WriteLine("[RunStdIoAsync] " + ex.Message);
+      }
+   }
+
+   // Run on arbitrary streams (TCP, Pipes)
+   public async Task RunOnStreamAsync(Stream read, Stream write, CancellationToken ct = default)
+   {
+      using var reader = new StreamReader(read, Encoding.UTF8, false, 8192, true);
+      using var writer = new StreamWriter(write, Encoding.UTF8, 8192, true) { AutoFlush = true };
+      await RunLoopAsync(reader, writer, ct);
+   }
+
+   private async Task RunLoopAsync(StreamReader reader, StreamWriter writer, CancellationToken ct)
+   {
       while (!ct.IsCancellationRequested)
       {
          var (ok, body) = await ReadFramedAsync(reader, ct);
          if (!ok) break; // EOF
 
-         _ = Task.Run(async () =>
+         McpRpcResponse? resp = null;
+         try
          {
-            McpRpcResponse? resp = null;
-            try
-            {
-               var req = JsonSerializer.Deserialize<McpRpcRequest>(body, _jsonSerializerOptions)!;
-               resp = await HandleAsync(req, ct);
+            var req = JsonSerializer.Deserialize<McpRpcRequest>(body, _jsonSerializerOptions)!;
+            resp = await HandleAsync(req, ct);
+         }
+         catch (Exception ex)
+         {
+            string? id = null;
+            try 
+            { 
+               id = JsonDocument.Parse(body).RootElement.GetProperty("id").GetString(); 
+            } 
+            catch (Exception innerEx)
+            { 
+               KernelIO.Error.WriteLine($"[server] Error parsing request ID: {innerEx.Message}");
             }
-            catch (Exception ex)
-            {
-               // Attempt to extract id for error correlation
-               string? id = null;
-               try { id = JsonDocument.Parse(body).RootElement.GetProperty("id").GetString(); }
-               catch { }
+            resp = McpRpcResponse.RpcError(id, -32603, $"Internal error: {ex.Message}");
+         }
 
-               resp = McpRpcResponse.RpcError(id, -32603, $"Internal error: {ex.Message}");
-            }
-
-            if (resp != null)
-            {
-               var payload = JsonSerializer.Serialize(resp, _jsonSerializerOptions);
-               await WriteFramedAsync(writer, payload, ct);
-            }
-         }, ct);
+         if (resp != null)
+         {
+            var payload = JsonSerializer.Serialize(resp, _jsonSerializerOptions);
+            await WriteFramedAsync(writer, payload, ct);
+         }
       }
    }
 
@@ -156,7 +161,8 @@ public sealed class McpServer
                   Deserialize<McpCallToolParams>((JsonElement)v, _jsonSerializerOptions)!;
                var (ok, result, error) = 
                   await _registry.TryCallAsync(call.Name, call.Arguments, ct);
-               if (ok) return McpRpcResponse.RpcResult(req.Id, new { result });
+               if (ok) 
+                  return McpRpcResponse.RpcResult(req.Id, new { result });
                return McpRpcResponse.RpcError(req.Id, -32001, error ?? "Tool error");
             }
 
@@ -249,6 +255,53 @@ public sealed class McpServer
       StreamWriter writer, string json, CancellationToken ct)
    {
       await writer.WriteAsync($"Content-Length: {Encoding.UTF8.GetByteCount(json)}\r\n\r\n{json}");
+   }
+
+   public async Task<RequestResult> RunWorkflowAsync(JsonDocument payload, CancellationToken ct)
+   {
+      var root = payload.RootElement;
+      var name = root.GetProperty("name").GetString()!;
+      var inputs = root.TryGetProperty("inputs", out var inp) ? inp : default;
+
+      switch (name)
+      {
+         case "draft-and-rewrite":
+            var topic = inputs.TryGetProperty("topic", out var topicEl) ? 
+               topicEl.GetString() : "a note";
+            var style = inputs.TryGetProperty("style", out var styleEl) ? 
+               styleEl.GetString() : "concise and friendly";
+
+            var chat = _kernelHost.GetChatService();
+
+            var settings = new OpenAIPromptExecutionSettings
+            {
+               MaxTokens = 300,
+               Temperature = 0.2,
+               TopP = 0.9,
+               PresencePenalty = 0,
+               FrequencyPenalty = 0,
+               StopSequences = new[] { "\n\n" }
+            };
+
+            var history = new ChatHistory();
+            history.AddSystemMessage($"Write a short draft about the topic in a {style} style.");
+            history.AddUserMessage(topic!);
+            var draft = await chat.GetChatMessageContentAsync(
+               history, settings, _kernelHost.Instance, ct);
+
+            var rewriter = _kernelHost.GetFunction("writing", "rewrite");
+            if (rewriter == null)
+            {
+               return RequestResult.Fail("Workflow error: 'rewrite' function not found");
+            }
+            var rewritten = await _kernelHost.Instance.InvokeAsync(
+               rewriter, new() { ["input"] = draft.Content ?? string.Empty }, ct);
+
+            return RequestResult.Okey(new { draft = draft.Content, final = rewritten.ToString() });
+
+         default:
+            return RequestResult.Fail($"Unknown workflow: {name}");
+      }
    }
 
 }

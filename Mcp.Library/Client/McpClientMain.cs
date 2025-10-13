@@ -1,5 +1,8 @@
-﻿using Mcp.Library.Models;
-using ai.SemanticKernel.Library;
+﻿using ai.SemanticKernel.Library;
+using Mcp.Library.Models;
+using Mcp.Library.Server;
+using Mcp.Library.Transports;
+using OllamaSharp.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,43 +40,52 @@ public class McpClientMain
    /// operation, which can be  "spawn" (default) or "attach". Additional arguments are passed to 
    /// the MCP client for processing.</param>
    /// <returns>A task that represents the asynchronous operation.</returns>
-   public static async Task Main(string[] args)
+   public static async Task<int> Main(string[] args, IMcpTransport transport)
    {
       var options = McpJson.Options;
+      IMcpTransport mcpTransport;
 
-      // arg parsing (super light)
-      var mode = args.FirstOrDefault() ?? "spawn"; // default spawn for demo
-
-      using var client = new McpClient(options);
-
-      if (string.Equals(mode, "spawn", StringComparison.OrdinalIgnoreCase))
+      // Note that if spawn mode is used, the server must be started separately
+      // (e.g. via McpServerProcess.SpawnServerForStdio)
+      bool spawnMode = args.Length == 0;
+      if (spawnMode || args.Contains("stdio"))
       {
-         var (cmd, argStr, env) = ParseSpawnArgs(args.Skip(1).ToArray());
-         await client.SpawnAsync(cmd, argStr, env);
+         // spawn server as child process
+         //string[] serverArgs = new string[] { "server-stdio" };
+         //McpServerProcess.SpawnServerForStdioSameExe(
+         //   serverArgs, new Dictionary<string, string?>());
+
+         // prepare stdio transport
+         mcpTransport = transport ?? McpTransports.StdioConnect();
       }
       else
       {
-         // attach means the server is already launched by you. We simply
-         // read/write the child's stdio created here (same as spawn without env)
-         var (cmd, argStr, _) = ParseSpawnArgs(args.Skip(1).ToArray());
-         await client.SpawnAsync(cmd, argStr, new());
+         // Connect transport based on args.
+         mcpTransport = args[0] switch
+         {
+            "tcp" when args.Length >= 3 && int.TryParse(args[2], out var p) =>
+               await McpTransports.TcpConnectAsync(args[1], p),
+            "pipe" when args.Length >= 2 => await McpTransports.NamedPipeConnectAsync(args[1]),
+            _ => throw new ArgumentException(
+               "Invalid args. Use: tcp <host> <port> | pipe <name> | stdio")
+         };
       }
 
-      // initialize
+      using var client = new McpClient(McpJson.Options, mcpTransport);
+
+      // Handshake
       var init = await client.InitializeAsync();
-      KernelIO.Console.WriteLine(
-         $"Initialized MCP server: {init.ServerInfo.Name} " +
-         $"v{init.ServerInfo.Version} " +
-         $"(protocol {init.ProtocolVersion})\n");
+      KernelIO.Log.WriteLine(
+         $"Initialized: {init.ServerInfo.Name} v{init.ServerInfo.Version} (proto {init.ProtocolVersion})\n");
 
-      // tools/list
+      // Discover tools
       var tools = await client.ListToolsAsync();
-      KernelIO.Console.WriteLine("Tools available:");
+      KernelIO.Log.WriteLine("Tools available:");
+
       foreach (var t in tools)
-      {
-         Console.WriteLine($" - {t.Name}: {t.Description}");
-      }
-      KernelIO.Console.WriteLine();
+         KernelIO.Log.WriteLine($" - {t.Name}: {t.Description}");
+
+      KernelIO.Log.WriteLine();
 
       // Example calls
       var embedDesc = McpHelper.FindEmbeddingsTool(tools);
@@ -85,12 +97,13 @@ public class McpClientMain
              embedDesc // enables light schema validation via McpTyped
          );
 
-         Console.WriteLine($"\nembeddings.embed => count={embRes.count}, dims={embRes.dimensions}");
+         KernelIO.Log.WriteLine(
+            $"\nembeddings.embed => count={embRes.count}, dims={embRes.dimensions}");
          if (embRes.embeddings?.Length > 0)
          {
             var first = string.Join(
                ", ", embRes.embeddings[0].Take(8).Select(v => v.ToString("0.###")));
-            Console.WriteLine($"first[0..8]: [ {first} ... ]");
+            KernelIO.Log.WriteLine($"first[0..8]: [ {first} ... ]");
          }
       }
 
@@ -111,32 +124,34 @@ public class McpClientMain
          };
 
          var simRes = await McpHelper.SemanticSimilarityAsync(client, simReq, simDesc);
-         Console.WriteLine("\nsemantic.similarity (top results):");
+         KernelIO.Log.WriteLine("\nsemantic.similarity (top results):");
          foreach (var r in simRes.results)
          {
-            Console.WriteLine($" - {r.id}: score={r.score:0.000} text='{r.text}'");
+            KernelIO.Log.WriteLine($" - {r.id}: score={r.score:0.000} text='{r.text}'");
          }
       }
 
-      var chat = tools.FirstOrDefault(x => x.Name == "chat.complete");
+      var chat = McpHelper.FindChatCompletionsTool(tools);
       if (chat != null)
       {
          var argsObj = JsonDocument.Parse(
             "{\"prompt\": \"Say hello from the MCP client!\"}").RootElement;
          var resp = await McpHelper.ChatAsync(client, argsObj, chat);
-         Console.WriteLine($"chat.complete => {resp}");
+         KernelIO.Log.WriteLine($"chat.complete => {resp}");
       }
 
-      if (tools.Any(t => t.Name == "workflow.run"))
+      var workflowRun = McpHelper.FindWorkflowRunTool(tools);
+      if (workflowRun != null)
       {
          var wfArgs = JsonDocument.Parse(
-            "{\n \"name\": \"draft-and-rewrite\",\n \"inputs\": +" +
+            "{\n \"name\": \"draft-and-rewrite\",\n \"inputs\": " +
             "{ \"topic\": \"why MCP + SK is neat\", \"style\": \"succinct\" }\n}").RootElement;
          var wf = await client.CallAsync<JsonElement>("workflow.run", wfArgs);
-         Console.WriteLine($"workflow.run => {wf}");
+         KernelIO.Log.WriteLine($"workflow.run => {wf}");
       }
 
-      Console.WriteLine("\nDone.");
+      KernelIO.Log.WriteLine("\nDone.");
+      return 0;
    }
 
    /// <summary>

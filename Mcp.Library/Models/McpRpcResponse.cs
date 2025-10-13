@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
@@ -14,6 +15,14 @@ public sealed class McpRpcResponse
    [JsonPropertyName("id")] public string? Id { get; set; }
    [JsonPropertyName("result")] public object? Result { get; set; }
    [JsonPropertyName("error")] public McpError? Error { get; set; }
+
+   public JsonElement? ResultAsJsonElement
+   {
+      get {
+         if (Result is JsonElement je) return je;
+         return null;
+      }
+   }
 
    public static McpRpcResponse RpcResult(string? id, object result) => new()
    { 

@@ -73,6 +73,15 @@ public class KernelHost
    }
 
    /// <summary>
+   /// Get an instance of the chat service from the service container.
+   /// </summary>
+   /// <returns>return IChatCompletionService instance</returns>
+   public IChatCompletionService GetChatService()
+   {
+      return _kernel.GetRequiredService<IChatCompletionService>();
+   }
+
+   /// <summary>
    /// Retrieves an instance of the <see cref="IChatCompletionService"/> from the service container.
    /// </summary>
    /// <remarks>The returned service instance is resolved using the dependency injection container. 
@@ -82,6 +91,20 @@ public class KernelHost
    public IChatCompletionService GetChatCompletionService()
    {
       return _kernel.GetRequiredService<IChatCompletionService>();
+   }
+
+   /// <summary>
+   /// Get a function from a plugin by name.
+   /// </summary>
+   /// <param name="pluginName">plugin name</param>
+   /// <param name="functionName">function name</param>
+   /// <returns>function instance</returns>
+   public KernelFunction GetFunction(string pluginName, string functionName)
+   {
+      KernelFunction? func = null;
+      if (_kernel.Plugins.TryGetFunction(pluginName, functionName, out func))
+         return func;
+      return null;
    }
 
    /// <summary>
@@ -158,9 +181,7 @@ public class KernelHost
          builder.Services.AddSingleton(qdrantClient);
          builder.Services.AddQdrantVectorStore(); // DI extension from SK Qdrant connector
       }
-
-      // GetRewriteFunction();
-
+      
       var kernel = builder.Build();
 
       return kernel;
