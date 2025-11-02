@@ -11,7 +11,7 @@ namespace ai.SemanticKernel.Sampler.Console.MemoryStoreEmbeddings;
 
 
 /// <summary>
-/// 
+/// Memory Store with Embeddings Sample - Activity Support...
 /// </summary>
 public class ActivitySupport
 {

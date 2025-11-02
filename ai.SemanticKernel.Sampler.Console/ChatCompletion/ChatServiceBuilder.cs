@@ -10,7 +10,7 @@ using ai.SemanticKernel.Sampler.Console.ChatCompletion;
 namespace ai.SemanticKernel.Sampler.Console.ChatCompletion;
 
 /// <summary>
-/// [Chat Completion] Chat Service Buildeer.
+/// [Chat Completion] Chat Service Builder.
 /// </summary>
 public class ChatServiceBuilder
 {

@@ -34,10 +34,10 @@ public class McpServerMain
       Console.InputEncoding = Encoding.UTF8;
 
       var jsonOptions = McpJson.Options;
-      var config = new KernelConfig(needEmbeddings: true);
+      var config = new ProviderConfig(needEmbeddings: true);
 
       // Initialize SK
-      var kernelHost = await KernelHost.CreateAsync(config);
+      var kernelHost = await KernelHost.PrepareKernelHostAsync(config);
       kernelHost.GetRewriteFunction();
 
       // Register AI-centric tools

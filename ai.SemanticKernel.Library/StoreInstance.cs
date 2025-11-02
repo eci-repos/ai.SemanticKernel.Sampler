@@ -62,11 +62,11 @@ public class StoreInstance
    /// the vector store.</param>
    /// <returns>A new instance of <see cref="QdrantVectorStore"/> configured with the necessary 
    /// embedding generator and client options.</returns>
-   public QdrantVectorStore PrepareVectorStore(KernelConfig config)
+   public QdrantVectorStore PrepareVectorStore(ProviderConfig config)
    {
       // Configure Qdrant Vector Store and let it auto-embed via the generator
       _vectorStore = new QdrantVectorStore(
-          qdrantClient: new QdrantClient(config.StoreHost),
+          qdrantClient: new QdrantClient(config.Store.StoreHost),
           ownsClient: false,
           options: new QdrantVectorStoreOptions { EmbeddingGenerator = embeddingService }
       );

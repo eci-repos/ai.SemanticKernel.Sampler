@@ -8,18 +8,21 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.0-rc.2.25502.107" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0-rc.2.25502.107" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0-rc.2.25502.107" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0-rc.2.25502.107" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.10" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Mcp.Library\Mcp.Library.csproj" />
+    <ProjectReference Include="..\ai.SemanticKernel.Library\ai.SemanticKernel.Library.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Update="appSettings.Designer.cs">
+    <Compile Update="appsettings.Designer.cs">
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
-      <AutoGen>True</AutoGen>
       <DependentUpon>appSettings.json</DependentUpon>
+      <AutoGen>True</AutoGen>
     </Compile>
   </ItemGroup>
 

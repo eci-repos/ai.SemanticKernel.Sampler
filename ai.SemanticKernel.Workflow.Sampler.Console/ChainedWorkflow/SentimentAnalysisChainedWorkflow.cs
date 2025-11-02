@@ -16,9 +16,9 @@ public class SentimentAnalysisChainedWorkflow
       get { return _kernelInstance.Instance; }
    }
 
-   public static KernelConfig GetConfig()
+   public static ProviderConfig GetConfig()
    {
-      var config = new KernelConfig();
+      var config = new ProviderConfig();
       return config;
    }
 
@@ -27,7 +27,7 @@ public class SentimentAnalysisChainedWorkflow
    /// </summary>
    /// <param name="config"></param>
    /// <returns>A Kernel instance is returned</returns>
-   public Kernel PrepareKernel(KernelConfig? config = null)
+   public Kernel PrepareKernel(ProviderConfig? config = null)
    {
       if (config == null)
       {

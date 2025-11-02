@@ -62,7 +62,7 @@ public class ContextSearchManager
    {
       // Create/get a strongly typed collection
       var vectorStore = _kernel.Services.GetRequiredService<QdrantVectorStore>();
-      _collection = vectorStore.GetCollection<Guid, ActivityChunk>(_config.DefaultCollection);
+      _collection = vectorStore.GetCollection<Guid, ActivityChunk>(_config.Store.DefaultCollection);
 
       // Ingest -upsert chunks (embeddings computed automatically)
       await _collection.EnsureCollectionDeletedAsync(); // start fresh
@@ -78,7 +78,7 @@ public class ContextSearchManager
 
       // Generate embeddings
       var gen = await embeddingGenerator.GenerateAsync(
-          textChunks, new EmbeddingGenerationOptions { ModelId = _config.EmbeddingModel }
+          textChunks, new EmbeddingGenerationOptions { ModelId = _config.Embedding.EmbeddingModel }
       );
       for (int i = 0; i < chunks.Count; i++)
       {

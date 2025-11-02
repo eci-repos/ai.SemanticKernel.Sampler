@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 // -------------------------------------------------------------------------------------------------
 namespace ai.SemanticKernel.Sampler.Console.RAG_TextSearch_Enhanced;
 
-public class ContextManagerConfig : KernelConfig
+public class ContextManagerConfig : ProviderConfig
 {
 
    public string TextSearchPluginName { get; set; } = "ActivitiesSearch";

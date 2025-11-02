@@ -10,6 +10,8 @@ namespace ai.SemanticKernel.Sampler.Console.HandlebarsTemplates;
 public class HandlebarsTemplating
 {
 
+   #region -- Basic Template --
+
    /// <summary>
    /// Basic Template showcasing Hendlebars feature.
    /// </summary>
@@ -83,6 +85,9 @@ public class HandlebarsTemplating
 
       return outText;
    }
+
+   #endregion
+   #region -- Complex Template --
 
    /// <summary>
    /// User Plugin to get user info based on given ID.
@@ -184,6 +189,7 @@ public class HandlebarsTemplating
       return outText;
    }
 
+   #endregion
+
 }
 
-// 

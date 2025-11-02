@@ -27,7 +27,7 @@ public class WebDaprApplication
 
    public WebDaprApplication(WebApplication app)
    {
-      _chatService = new ChatService(new KernelConfig());
+      _chatService = new ChatService(new ProviderConfig());
       _app = app;
    }
 

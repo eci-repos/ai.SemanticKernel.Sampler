@@ -56,7 +56,7 @@ public sealed class ToolRegistry
    public static ToolRegistry BuildTools(
       JsonSerializerOptions jsonOptions, KernelHost skHost)
    {
-      var config = skHost.Config as KernelConfig;
+      var config = skHost.Config as ProviderConfig;
       var registry = new ToolRegistry(jsonOptions, skHost);
 
       // Embeddings for a single string or a batch
@@ -98,7 +98,8 @@ public sealed class ToolRegistry
                     return RequestResult.Fail("Provide either 'text' or 'texts'.");
                  }
 
-                 var vectors = await TextChunker.GetEmbeddings(embed, inputs, config.ChatModel);
+                 var vectors = await TextChunker.GetEmbeddings(
+                    embed, inputs, config.Model.ChatModel);
 
                  var data = new
                  {
@@ -166,13 +167,15 @@ public sealed class ToolRegistry
                  var embed = skHost.GetEmbeddingGenerator();
 
                  // Embed prompt
-                 var promptVec = await TextChunker.GetEmbeddings(embed, prompt, config.ChatModel);
+                 var promptVec = await TextChunker.GetEmbeddings(
+                    embed, prompt, config.Model.ChatModel);
 
                  // Embed each record and score
                  var scored = new List<dynamic>(records.Length);
                  foreach (var r in records)
                  {
-                    var recVec = await TextChunker.GetEmbeddings(embed, r.text, config.ChatModel);
+                    var recVec = await TextChunker.GetEmbeddings(
+                       embed, r.text, config.Model.ChatModel);
                     var score = TextSimilarity.CosineSimilarity(promptVec, recVec);
 
                     scored.Add(new

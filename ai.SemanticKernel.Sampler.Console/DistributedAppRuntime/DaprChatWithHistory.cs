@@ -10,13 +10,16 @@ using System.Threading.Tasks;
 // -------------------------------------------------------------------------------------------------
 namespace ai.SemanticKernel.Sampler.Console.DistributedAppRuntime;
 
+/// <summary>
+/// Entry point for Dapr Chat with History sample...
+/// </summary>
 public class DaprChatWithHistory
 {
 
    public static async Task RunAsync()
    {
       System.Console.WriteLine("Dapr Chat with History sample.");
-      ChatService chatService = new ChatService(new KernelConfig());
+      ChatService chatService = new ChatService(new ProviderConfig());
       var result = await chatService.SendMessageAsync(
          "user1", "What is the main purpose of AI Semantic Search in a database?");
    }

@@ -13,7 +13,7 @@ public class ChatServiceController : ControllerBase
    private readonly ChatService _chatService;
    public ChatServiceController()
    {
-      _chatService = new ChatService(new KernelConfig());
+      _chatService = new ChatService(new ProviderConfig());
    }
    [HttpPost("chat")]
    public async Task<IActionResult> Chat([FromQuery] string userId, [FromQuery] string message)

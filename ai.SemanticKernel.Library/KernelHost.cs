@@ -21,6 +21,9 @@ namespace ai.SemanticKernel.Library;
 public class KernelHost
 {
 
+   #region -- 1.00 - Members
+
+   private ChatHistory _chatHistory = new ChatHistory();
    private Kernel _kernel;
    private object _config;
 
@@ -34,6 +37,14 @@ public class KernelHost
       get { return _config; }
    }
 
+   public ChatHistory ChatHistory
+   {
+      get { return _chatHistory; }
+   }
+
+   #endregion
+   #region -- 1.50 - Constructures
+
    /// <summary>
    /// Kernel instance constructor.
    /// </summary>
@@ -41,20 +52,11 @@ public class KernelHost
    public KernelHost(object config)
    {
       _config = config;
-      _kernel = PrepareKernel(config as KernelConfig);
+      _kernel = PrepareKernel(config as ProviderConfig);
    }
 
-   /// <summary>
-   /// Creates a KernelHost instance based on the provided configuration.
-   /// </summary>
-   /// <param name="config">configuration to be used</param>
-   /// <returns>Instance of KernelHost is returned</returns>
-   public static async Task<KernelHost> CreateAsync(object config)
-   {
-      var host = new KernelHost(config);
-      await Task.CompletedTask;
-      return host;
-   }
+   #endregion
+   #region -- 4.00 - Services Accessors
 
    /// <summary>
    /// Retrieves an instance of an embedding generator for generating embeddings
@@ -93,6 +95,9 @@ public class KernelHost
       return _kernel.GetRequiredService<IChatCompletionService>();
    }
 
+   #endregion
+   #region -- 4.00 - Support Plugin Functions
+
    /// <summary>
    /// Get a function from a plugin by name.
    /// </summary>
@@ -129,6 +134,31 @@ public class KernelHost
       return func;
    }
 
+   #endregion
+   #region -- 4.00 - Prepare Kernel Host/Kernel
+
+   /// <summary>
+   /// Prepare a KernelHost instance using the provided configuration.
+   /// </summary>
+   /// <param name="config">provided configuration</param>
+   /// <returns>instance of KernelHost is returned</returns>
+   public static KernelHost PrepareKernelHost(ProviderConfig? config)
+   {
+      return new KernelHost(config);
+   }
+
+   /// <summary>
+   /// Creates a KernelHost instance based on the provided configuration.
+   /// </summary>
+   /// <param name="config">configuration to be used</param>
+   /// <returns>Instance of KernelHost is returned</returns>
+   public static async Task<KernelHost> PrepareKernelHostAsync(object config)
+   {
+      var host = new KernelHost(config);
+      await Task.CompletedTask;
+      return host;
+   }
+
    /// <summary>
    /// Using given configuration details build a kernel instance.
    /// </summary>
@@ -150,7 +180,7 @@ public class KernelHost
    /// manager,  including model endpoints, embedding models, and vector store connection details.
    /// </param>
    /// <returns>instance of kernel returned</returns>
-   public static Kernel PrepareKernel(KernelConfig? config)
+   public static Kernel PrepareKernel(ProviderConfig? config)
    {
 
       // Build kernel with Ollama chat + embeddings
@@ -159,24 +189,54 @@ public class KernelHost
       // Chat completion 
       if (config.ModelNeeded)
       {
-         builder.AddOllamaChatCompletion(
-             modelId: config.ChatModel,
-             endpoint: new Uri(config.Endpoint));
+         switch (config.Model.ModelProvider)
+         {
+            case ModelProvider.Ollama:
+               builder.AddOllamaChatCompletion(
+                  modelId: config.Model.ChatModel,
+                  endpoint: new Uri(config.Model.Endpoint),
+                  serviceId: config.ServiceId);
+               break;
+            case ModelProvider.FoundryLocal:
+               builder.AddOpenAIChatCompletion(
+                  modelId: config.Model.ChatModel,
+                  endpoint: new Uri(config.Model.Endpoint),
+                  apiKey: null,
+                  serviceId: config.ServiceId);
+               break;
+            case ModelProvider.OpenAI:
+               builder.AddOpenAIChatCompletion(
+                  modelId: config.Model.ChatModel,
+                  endpoint: new Uri(config.Model.Endpoint),
+                  apiKey: config.Model.ApiKey,
+                  serviceId: config.ServiceId);
+               break;
+            default:
+               break;
+         }
       }
 
       // Embeddings
       if (config.EmbeddingsNeeded)
       {
-         builder.AddOllamaEmbeddingGenerator(
-            modelId: config.EmbeddingModel,
-            endpoint: new Uri(config.Endpoint));
+         switch (config.Embedding.EmbeddingProvider)
+         {
+            case ModelProvider.Ollama:
+               builder.AddOllamaEmbeddingGenerator(
+                  modelId: config.Embedding.EmbeddingModel,
+                  endpoint: new Uri(config.Embedding.Endpoint));
+               break;
+            default:
+               break;
+         }
       }
 
       // Register Qdrant Vector Store
       if (config.MemoryStoreNeeded)
       {
          // Qdrant connection (defaults to localhost:6333; add API key/URI if needed)
-         var qdrantClient = new QdrantClient(host: config.StoreHost, port: config.StorePort);
+         var qdrantClient = new QdrantClient(
+            host: config.Store.StoreHost, port: config.Store.StorePort);
 
          builder.Services.AddSingleton(qdrantClient);
          builder.Services.AddQdrantVectorStore(); // DI extension from SK Qdrant connector
@@ -186,6 +246,9 @@ public class KernelHost
 
       return kernel;
    }
+
+   #endregion
+   #region -- 4.00 - Support Workflow Execution
 
    /// <summary>
    /// Executes a workflow based on the provided payload and returns the result.
@@ -261,6 +324,33 @@ public class KernelHost
             return RequestResult.Fail($"Unknown workflow: {name}");
       }
    }
+
+   #endregion
+   #region -- 4.00 - Chat Message Content Helper
+
+   /// <summary>
+   /// Get Chat Message Content Async.
+   /// </summary>
+   /// <param name="query">submitted query</param>
+   /// <param name="executionSettings">(optional) execution settings</param>
+   /// <param name="cancellationToken">(optional) cancellation token</param>
+   /// <returns></returns>
+   public async Task<string> GetChatMessageContentAsync(
+      string query,
+      PromptExecutionSettings? executionSettings = null,
+      CancellationToken cancellationToken = default)
+   {
+      _chatHistory.AddUserMessage(query);
+      var chatService = GetChatCompletionService();
+      var response = await chatService.GetChatMessageContentAsync(
+         query,
+         executionSettings,
+         _kernel,
+         cancellationToken);
+      return response.Content ?? string.Empty;
+   }
+
+   #endregion
 
 }
 

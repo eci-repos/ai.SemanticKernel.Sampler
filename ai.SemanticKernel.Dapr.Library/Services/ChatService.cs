@@ -21,7 +21,7 @@ public class ChatService
    /// ChatService constructor initializes the Semantic Kernel and ChatPlugin.
    /// </summary>
    /// <param name="config">kernel and model configuration information</param>
-   public ChatService(KernelConfig config)
+   public ChatService(ProviderConfig config)
    {
       KernelHost kernelInstance = new KernelHost(config);
       _kernel = kernelInstance.Instance;
