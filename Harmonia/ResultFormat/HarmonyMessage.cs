@@ -1,0 +1,61 @@
+﻿// -------------------------------------------------------------------------------------------------
+namespace Harmonia.ResultFormat;
+
+
+/// <summary>
+/// Raw Harmony roles include fixed roles and tool-named roles (e.g., "functions.getweather").
+/// We keep Role as string to preserve tool role names exactly as emitted. (Spec) 
+/// </summary>
+public sealed class HarmonyMessage
+{
+
+   /// <summary>
+   /// Gets the role associated with the entity, indicating its function or identity within the
+   /// system. For example, standard roles include "user", "assistant", and "system".
+   /// </summary>
+   /// <remarks>The role determines the context in which the entity operates. Custom roles, such 
+   /// as tool names, may also be used.</remarks>
+   public required string Role { get; init; }
+
+   /// <summary>
+   /// Gets the communication channel associated with the current instance. 
+   /// Required for assistant/tool messages per spec.
+   /// </summary>
+   public HarmonyChannel? Channel { get; init; }
+
+   /// <summary>
+   /// Gets the recipient identifier associated with the current context.
+   /// e.g., "functions.getweather" (when role=assistant & channel=commentary)
+   /// </summary>
+   public string? Recipient { get; init; }
+
+   /// <summary>
+   /// Gets the content type associated with the current instance, such as "json".
+   /// </summary>
+   public string? ContentType { get; init; }
+
+   /// <summary>
+   /// Gets the content as a string. This property is immutable and must be initialized when the
+   /// object is created (body after <|message|>).
+   /// </summary>
+   public string Content { get; init; } = string.Empty;
+
+   /// <summary>
+   /// Gets the termination status of the harmony process.
+   /// from <|return|> | <|call|> | <|end|>
+   /// </summary>
+   public HarmonyTermination? Termination { get; init; }
+
+   /// <summary>
+   /// Returns a string representation of the object, including the role, channel, and recipient 
+   /// information if available.
+   /// </summary>
+   /// <returns>A string that represents the current object, formatted as 
+   /// "Role [Channel] to=Recipient" if a recipient is specified, or "Role [Channel]"
+   /// otherwise.</returns>
+   public override string ToString() => 
+      $"{Role} [{Channel}] {(Recipient != null ? "to=" + Recipient : "")}";
+
+}
+
+
