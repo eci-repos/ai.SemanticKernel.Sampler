@@ -10,12 +10,17 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI; // or Azure, depending on your setup
 
-using Harmonia.Executor;                  // SemanticKernelInterop
+using Harmonia.Executor;
 using Harmonia.ResultFormat;
 using HarmoniaFoodTools;
 using ai.SemanticKernel.Library;
-using System.Text.Json.Serialization;                  // AsianFoodTools
+using System.Text.Json.Serialization;
 
+
+// -------------------------------------------------------------------------------------------------
+// EMPHASIS: is being placed on the JSON Harmony Request/Response Format parsing capabilities; find
+//           JSON parsing-execution within the HarmonyExecutor class.
+// TODO: Harmony Request/Response Format needs to be tested and documented.
 // -------------------------------------------------------------------------------------------------
 namespace HarmoniaFoodDemo;
 

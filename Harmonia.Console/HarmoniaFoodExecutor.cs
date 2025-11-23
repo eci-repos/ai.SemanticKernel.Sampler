@@ -24,11 +24,9 @@ public class HarmoniaFoodExecutor
    public static async Task MainAsync(string[] args)
    {
       string harmonyJson = args.Length > 0
-         ? args[0]
-         : "foodPlannerSample.1.json";
+         ? args[0] : "foodPlannerSample.1.json";
 
       Kernel kernel = BuildKernelWithTools();
-      var runner = new HarmoniaFoodTester(kernel);
 
       // Parse the Harmony message
       string json = File.ReadAllText("Scripts/" + harmonyJson);
