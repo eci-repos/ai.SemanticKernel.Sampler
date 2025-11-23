@@ -8,7 +8,7 @@ namespace HarmoniaFoodTools;
 
 /// <summary>
 /// Native Semantic Kernel plugin implementing the Harmony `functions.*` tools
-/// used by the Asian food preparation Harmony script.
+/// used by the food preparation Harmony script.
 /// 
 /// Tool names and parameter names are chosen to exactly match the Harmony
 /// JSON tool definitions:
@@ -22,14 +22,14 @@ namespace HarmoniaFoodTools;
 /// SemanticKernelInterop can simply call ToString() on the result and write
 /// it back into the Harmony conversation as tool output.
 /// </summary>
-public sealed class AsianFoodTools
+public sealed class FoodTools
 {
 
    /// <summary>
-   /// Search for Asian recipes that match the user constraints.
+   /// Search for recipes that match the user constraints.
    /// </summary>
    [KernelFunction("search_recipes")]
-   [Description("Search for Asian recipes that match cuisine, dietary tags, time budget, dish count, and spice level.")]
+   [Description("Search for recipes that match cuisine, dietary tags, time budget, dish count, and spice level.")]
    public Task<string> search_recipes(
       [Description("Primary cuisine region, e.g. 'Japanese', 'Thai', 'Chinese-Sichuan'.")]
       string? cuisine_region = null,
@@ -209,7 +209,7 @@ public sealed class AsianFoodTools
    }
 
    /// <summary>
-   /// Builds a Semantic Kernel instance with the AsianFoodTools plugin imported.
+   /// Builds a Semantic Kernel instance with the FoodTools plugin imported.
    /// </summary>
    /// <returns>Kernel instance is returned</returns>
    public static Kernel BuildKernelWithTools()
@@ -221,7 +221,7 @@ public sealed class AsianFoodTools
       var kernel = builder.Build();
 
       // Import plugin into kernel.Plugins as "functions"
-      kernel.ImportPluginFromObject(new AsianFoodTools(), "functions");
+      kernel.ImportPluginFromObject(new FoodTools(), "functions");
 
       return kernel;
    }

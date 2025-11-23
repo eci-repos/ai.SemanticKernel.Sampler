@@ -66,7 +66,7 @@ namespace Harmonia.Executor
          foreach (var m in convo.Messages ?? Enumerable.Empty<HarmonyMessage>())
          {
             var role = m.Role ?? string.Empty;
-            var content = m.Content ?? string.Empty;
+            var content = m.Content.GetRawText();// ?? string.Empty;
 
             switch (role)
             {
@@ -183,7 +183,7 @@ namespace Harmonia.Executor
                      Role = recipient, // tool role
                      Channel = HarmonyChannel.Commentary,
                      ContentType = "json",
-                     Content = JsonSerializer.Serialize(new
+                     Content = JsonSerializer.SerializeToElement(new
                      {
                         error = "tool_not_found",
                         tool = recipient
@@ -199,11 +199,12 @@ namespace Harmonia.Executor
                var result = await kernel.InvokeAsync(kf, args, ct).ConfigureAwait(false);
 
                // Append tool output as a tool-role message on commentary
+               var resultElement = JsonSerializer.SerializeToElement(result);
                toolResultMessage = new HarmonyMessage
                {
                   Role = recipient, // tool-role
                   Channel = HarmonyChannel.Commentary,
-                  Content = result?.ToString() ?? string.Empty,
+                  Content = resultElement,
                   Termination = HarmonyTermination.End
                };
             }
@@ -214,7 +215,7 @@ namespace Harmonia.Executor
                   Role = recipient,
                   Channel = HarmonyChannel.Commentary,
                   ContentType = "json",
-                  Content = JsonSerializer.Serialize(new
+                  Content = JsonSerializer.SerializeToElement(new
                   {
                      error = "invalid_tool_arguments",
                      tool = recipient,
@@ -230,7 +231,7 @@ namespace Harmonia.Executor
                   Role = recipient,
                   Channel = HarmonyChannel.Commentary,
                   ContentType = "json",
-                  Content = JsonSerializer.Serialize(new
+                  Content = JsonSerializer.SerializeToElement(new
                   {
                      error = "tool_execution_failed",
                      tool = recipient,
@@ -254,12 +255,12 @@ namespace Harmonia.Executor
          var args = new KernelArguments();
 
          if (!string.Equals(m.ContentType, "json", StringComparison.OrdinalIgnoreCase) ||
-             string.IsNullOrWhiteSpace(m.Content))
+             m.Content.ValueKind == JsonValueKind.Undefined)
          {
             return args;
          }
 
-         using var doc = JsonDocument.Parse(m.Content);
+         using var doc = JsonDocument.Parse(m.Content.GetRawText());
          if (doc.RootElement.ValueKind != JsonValueKind.Object)
          {
             // Treat non-object roots as a single "value" parameter

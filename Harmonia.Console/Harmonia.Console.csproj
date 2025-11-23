@@ -8,11 +8,33 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
     <PackageReference Include="Microsoft.SemanticKernel" Version="1.67.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ai.SemanticKernel.Library\ai.SemanticKernel.Library.csproj" />
     <ProjectReference Include="..\Harmonia\Harmonia.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="appsettings.Designer.cs">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <DependentUpon>appSettings.json</DependentUpon>
+      <AutoGen>True</AutoGen>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appSettings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <LastGenOutput>appsettings.Designer.cs</LastGenOutput>
+      <Generator>SettingsSingleFileGenerator</Generator>
+    </None>
+    <None Update="Scripts\FoodPlannerSample.1.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

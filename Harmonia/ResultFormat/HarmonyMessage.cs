@@ -1,4 +1,6 @@
 ﻿// -------------------------------------------------------------------------------------------------
+using System.Text.Json;
+
 namespace Harmonia.ResultFormat;
 
 
@@ -15,13 +17,13 @@ public sealed class HarmonyMessage
    /// </summary>
    /// <remarks>The role determines the context in which the entity operates. Custom roles, such 
    /// as tool names, may also be used.</remarks>
-   public required string Role { get; init; }
+   public required string Role { get; set; }
 
    /// <summary>
    /// Gets the communication channel associated with the current instance. 
    /// Required for assistant/tool messages per spec.
    /// </summary>
-   public HarmonyChannel? Channel { get; init; }
+   public HarmonyChannel Channel { get; set; }
 
    /// <summary>
    /// Gets the recipient identifier associated with the current context.
@@ -35,10 +37,11 @@ public sealed class HarmonyMessage
    public string? ContentType { get; init; }
 
    /// <summary>
-   /// Gets the content as a string. This property is immutable and must be initialized when the
-   /// object is created (body after <|message|>).
+   /// Allow either string or object content:
+   /// - If the content is a simple text message, it can be represented as a string.
+   /// - If the content is structured data (e.g., JSON), it can be represented as a JsonElement.
    /// </summary>
-   public string Content { get; init; } = string.Empty;
+   public JsonElement Content { get; init; }
 
    /// <summary>
    /// Gets the termination status of the harmony process.

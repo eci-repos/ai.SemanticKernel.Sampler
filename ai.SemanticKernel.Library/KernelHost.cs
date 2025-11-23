@@ -177,11 +177,19 @@ public class KernelHost
    /// </list>
    /// </remarks>
    /// <param name="config">The configuration settings used to initialize the context search 
-   /// manager,  including model endpoints, embedding models, and vector store connection details.
+   /// manager, including model endpoints, embedding models, and vector store connection details.
    /// </param>
    /// <returns>instance of kernel returned</returns>
    public static Kernel PrepareKernel(ProviderConfig? config)
    {
+      // Are we have been given a config info?
+      if (config == null)
+      {
+         config = ProviderInfo.GetDefaultConfiguration();
+         if (config == null)
+            throw new InvalidOperationException(
+               "No valid configuration found to build the kernel instance.");
+      }
 
       // Build kernel with Ollama chat + embeddings
       IKernelBuilder builder = Kernel.CreateBuilder();

@@ -1,8 +1,12 @@
 ﻿
-
-// -------------------------------------------------------------------------------------------------
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
+// -------------------------------------------------------------------------------------------------
+// EMPHASIS: is being placed on the JSON Harmony Request/Response Format parsing capabilities; find
+//           JSON parsing-execution within the HarmonyExecutor class.
+// TODO: Harmony Request/Response Format needs to be tested and documented.
+// -------------------------------------------------------------------------------------------------
 namespace Harmonia.ResultFormat;
 
 /// <summary>
@@ -88,10 +92,10 @@ public class HarmonyParser
          var message = new HarmonyMessage
          {
             Role = role,
-            Channel = channel,
+            Channel = channel.Value,
             Recipient = recipient,
             ContentType = contentType,
-            Content = content,
+            Content = JsonSerializer.SerializeToElement(content),
             Termination = termToken switch
             {
                var t when t == HarmonyTokens.End => HarmonyTermination.End,
