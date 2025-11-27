@@ -10,9 +10,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Harmonia.Console;
-
 // -------------------------------------------------------------------------------------------------
+namespace Harmonia.Console;
 
 public class HarmoniaFoodExecutor
 {
@@ -23,13 +22,17 @@ public class HarmoniaFoodExecutor
    /// </summary>
    public static async Task MainAsync(string[] args)
    {
-      string harmonyJson = args.Length > 0
+      string jsonScriptFileName = args.Length > 0
          ? args[0] : "foodPlannerSample.1.json";
 
+      // Validate the Harmony JSON file against the given schema
+      HarmonySchemaValidator.Validate(jsonScriptFileName);
+
+      // prepare the kernel with tools...
       Kernel kernel = BuildKernelWithTools();
 
       // Parse the Harmony message
-      string json = File.ReadAllText("Scripts/" + harmonyJson);
+      string json = File.ReadAllText("Scripts/" + jsonScriptFileName);
       var envelope = HarmonyEnvelope.Parse(json);
 
       // Provide user input for extract-input step

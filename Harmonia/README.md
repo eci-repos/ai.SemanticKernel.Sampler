@@ -2,6 +2,8 @@
 
 ## Summary
 
+As a follow-up to the previous posts on the Harmony Response Format (HRF) today I am sharing a sample implementation of a JSON-based HRF alternative built entirely within a custom code library, without relying on an external HRF interpreter.
+
 This effort presents a comprehensive approach to implementing a JSON-based alternative to the Harmony Response Format (HRF) within a custom code library, eliminating reliance on external interpreters. The primary objective is to validate the parsing and execution of HRF-like scripts through a controlled, type-safe, and extensible runtime environment. While the included tools return synthetic data due to placeholder logic, this design emphasizes workflow orchestration rather than data fidelity.
 
 The architecture is structured around two core components: format parsing and workflow execution. Parsing responsibilities are handled by classes such as HarmonyEnvelope, HarmonyMessage, and HarmonyStep, which deserialize JSON structures and normalize input for runtime use. Execution is managed by HarmonyExecutor, which processes steps sequentially, including tool calls, conditional logic, and templated assistant messages. A dedicated test harness (HarmoniaFoodExecutor) demonstrates reproducible execution using sample scripts and controlled user input, ensuring traceability and ease of debugging.

@@ -41,6 +41,57 @@ public sealed class HarmonyExecutor
       _jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
    }
 
+   /// <summary>
+   /// Checks if the given channel is valid for tool calls (i.e., "commentary").
+   /// </summary>
+   /// <param name="channel">expected channel text</param>
+   /// <returns>true is returned if channel value is commentary as expected, elese false</returns>
+   /// <exception cref="InvalidOperationException"></exception>
+   public static bool IsToolChannel(string channel)
+   {
+      // commentary for orchestration...
+      bool isCommentary = channel.Equals("commentary", StringComparison.OrdinalIgnoreCase);
+      if (!isCommentary)
+         throw new InvalidOperationException(
+            "Tool calls must use channel='commentary' per Harmony conventions.");
+      return isCommentary;
+   }
+
+   /// <summary>
+   /// Check if the given channel is valid for analysis messages (i.e., "analysis").
+   /// </summary>
+   /// <param name="channel">value of channel</param>
+   /// <returns>true is returned if it is analysis</returns>
+   /// <exception cref="InvalidOperationException"></exception>
+   public static bool IsAnalysisChannel(string channel)
+   {
+      // analysis for internal reasoning...
+      bool isAnalysis = channel.Equals("analysis", StringComparison.OrdinalIgnoreCase);
+      if (!isAnalysis)
+      {
+         throw new InvalidOperationException(
+             $"Channel mismatch: expected 'analysis' for internal reasoning, got '{channel}'.");
+      }
+      return isAnalysis;
+   }
+
+   /// <summary>
+   /// Executes the Harmony script defined in the specified envelope using the provided input 
+   /// variables and returns the result asynchronously.
+   /// </summary>
+   /// <remarks>If the script does not produce an explicit final result, a summary is generated 
+   /// automatically from the execution context. The method executes all steps in the script 
+   /// sequentially and may halt early if a step requests it.</remarks>
+   /// <param name="envelope">The envelope containing the Harmony script and associated metadata
+   /// to be executed. Cannot be null.</param>
+   /// <param name="input">A dictionary of input variables to be supplied to the script. Keys are 
+   /// variable names; values are their
+   /// corresponding values. May be empty if no inputs are required.</param>
+   /// <param name="ct">A cancellation token that can be used to cancel the execution operation.
+   /// </param>
+   /// <returns>A task that represents the asynchronous operation. The task result contains a 
+   /// HarmonyExecutionResult with the
+   /// final output text and any updated variables from the script execution.</returns>
    public async Task<HarmonyExecutionResult> ExecuteAsync(
        HarmonyEnvelope envelope,
        IDictionary<string, object?> input,
@@ -173,13 +224,17 @@ public sealed class HarmonyExecutor
 
          case ToolCallStep s:
             {
+               // Validate channel (commentary for tool calls - orchestration)
+               IsToolChannel(s.Channel);
+
+               // Prepare args
                var (pluginName, functionName) = ParseRecipient(s.Recipient);
                var args = new KernelArguments();
                foreach (var (k, v) in s.Args)
                {
                   args[k] = ctx.EvalNode(v);
                }
-
+               
                var func = ctx.Kernel.Plugins.GetFunction(pluginName, functionName)
                   ?? throw new InvalidOperationException(
                      $"Function '{pluginName}.{functionName}' not found.");
@@ -207,6 +262,9 @@ public sealed class HarmonyExecutor
 
          case AssistantMessageStep s:
             {
+               // Validate channel (analysis - internal reasoning; never expose to end user)
+               IsAnalysisChannel(s.Channel ?? string.Empty);
+
                // Render content or template
                var text = !string.IsNullOrWhiteSpace(s.ContentTemplate)
                    ? ctx.RenderTemplate(s.ContentTemplate!)
