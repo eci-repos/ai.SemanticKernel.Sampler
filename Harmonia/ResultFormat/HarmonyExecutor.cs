@@ -11,14 +11,6 @@ using System.Threading.Tasks;
 // -------------------------------------------------------------------------------------------------
 namespace Harmonia.ResultFormat;
 
-public sealed class HarmonyExecutionResult
-{
-   public string FinalText { get; set; } = string.Empty;
-   public Dictionary<string, object?> Vars { get; set; } = new();
-}
-
-// -------------------------------------------------------------------------------------------------
-
 /// <summary>
 /// Executes Harmony workflows by orchestrating chat-based operations, tool invocations, and
 /// conditional logic using a provided kernel and chat completion service.
@@ -53,26 +45,8 @@ public sealed class HarmonyExecutor
       bool isCommentary = channel.Equals("commentary", StringComparison.OrdinalIgnoreCase);
       if (!isCommentary)
          throw new InvalidOperationException(
-            "Tool calls must use channel='commentary' per Harmony conventions.");
+            "HRF violation: tool calls must use channel='commentary' per Harmony conventions.");
       return isCommentary;
-   }
-
-   /// <summary>
-   /// Check if the given channel is valid for analysis messages (i.e., "analysis").
-   /// </summary>
-   /// <param name="channel">value of channel</param>
-   /// <returns>true is returned if it is analysis</returns>
-   /// <exception cref="InvalidOperationException"></exception>
-   public static bool IsAnalysisChannel(string channel)
-   {
-      // analysis for internal reasoning...
-      bool isAnalysis = channel.Equals("analysis", StringComparison.OrdinalIgnoreCase);
-      if (!isAnalysis)
-      {
-         throw new InvalidOperationException(
-             $"Channel mismatch: expected 'analysis' for internal reasoning, got '{channel}'.");
-      }
-      return isAnalysis;
    }
 
    /// <summary>
@@ -97,6 +71,20 @@ public sealed class HarmonyExecutor
        IDictionary<string, object?> input,
        CancellationToken ct = default)
    {
+      var json = JsonSerializer.Serialize(envelope);
+
+      // Full HRF validation (shema + semantics) before execution
+      var hrfError = envelope.ValidateForHrf();
+      if (hrfError != null)
+      {
+         // Surface HRF issues as a structured error result
+         return HarmonyExecutionResult.ErrorResult(
+            hrfError.Code,
+            $"Invalid Harmony envelope: {hrfError.Message}",
+            hrfError.Details);
+      }
+
+      // Extract 'harmony-script'
       var script = envelope.GetScript();
 
       // Initialize vars (from script.vars defaults)
@@ -123,17 +111,53 @@ public sealed class HarmonyExecutor
          chatHistory.AddUserMessage(u.Content);
       }
 
-      // Prepare execution
+      // Prepare execution context
       var execCtx = new ExecContext(_kernel, _chat, chatHistory, vars, input, _jsonOpts);
 
       // Execute steps sequentially
-      foreach (var step in script.Steps)
+      try
+      { 
+         foreach (var step in script.Steps)
+         {
+            var halted = await ExecuteStepAsync(execCtx, step, ct);
+            if (halted) break;
+
+            // Check termination markers in messages
+            foreach (var msg in envelope.Messages)
+            {
+               if (!string.Equals(msg.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+                  continue;
+
+               switch (msg.Termination)
+               {
+                  case HarmonyTermination.End:
+                     return Finalize(execCtx, "Execution ended by termination marker.");
+                  case HarmonyTermination.Return:
+                     return Finalize(execCtx, execCtx.FinalText);
+                  case HarmonyTermination.Call:
+                     await HandleToolCall(execCtx, msg);
+                     break;
+               }
+            }
+         }
+      }
+      catch (Exception ex) 
+       when (ex is InvalidOperationException
+             || ex is JsonException
+             || ex is FormatException)
       {
-         var halted = await ExecuteStepAsync(execCtx, step, ct);
-         if (halted) break;
+         // Treat all such failures as HRF execution violations
+         return HarmonyExecutionResult.ErrorResult(
+            "Error: Harmony execution failed due to HRF violation.",
+            "HRF_EXECUTION_ERROR",
+            new
+            {
+               exception = ex.GetType().Name,
+               message = ex.Message
+            });
       }
 
-      // If no explicit final added, we can still ask the LLM to summarize
+      // Fallback: If no explicit final text, ask the LLM to summarize
       if (string.IsNullOrWhiteSpace(execCtx.FinalText))
       {
          // As a fallback, ask LLM to compile a final answer from the context
@@ -144,11 +168,34 @@ public sealed class HarmonyExecutor
          execCtx.FinalText = string.Join("\n", result.Select(r => r.Content));
       }
 
-      return new HarmonyExecutionResult
-      {
-         FinalText = execCtx.FinalText,
-         Vars = new(execCtx.Vars)
-      };
+      return Finalize(execCtx, execCtx.FinalText);
+   }
+
+   /// <summary>
+   /// Finalizes the execution result by packaging the final text and variables.
+   /// </summary>
+   /// <param name="ctx">execution context</param>
+   /// <param name="finalText">final text</param>
+   /// <returns>HarmonyExecutionResult</returns>
+   private HarmonyExecutionResult Finalize(ExecContext ctx, string finalText) =>
+       new HarmonyExecutionResult { FinalText = finalText, Vars = new(ctx.Vars) };
+
+   /// <summary>
+   /// Handles tool call terminations by invoking the specified plugin function.
+   /// </summary>
+   /// <param name="ctx">execution context</param>
+   /// <param name="msg">harmony message</param>
+   /// <returns>Task</returns>
+   /// <exception cref="InvalidOperationException"></exception>
+   private async Task HandleToolCall(ExecContext ctx, HarmonyMessage msg)
+   {
+      if (msg.Recipient is null)
+         throw new InvalidOperationException("Tool call termination requires recipient.");
+      var (plugin, function) = ParseRecipient(msg.Recipient);
+      var func = ctx.Kernel.Plugins.GetFunction(plugin, function)
+          ?? throw new InvalidOperationException($"Function '{plugin}.{function}' not found.");
+      var args = new KernelArguments(); // Populate from msg.Content if needed
+      await ctx.Kernel.InvokeAsync(func, args);
    }
 
    /// <summary>
@@ -189,6 +236,11 @@ public sealed class HarmonyExecutor
       return normalizedArgs;
    }
 
+   private bool ValidateExpressionSyntax(string expr)
+   {
+      return Regex.IsMatch(expr, @"^\$(vars|input|len|map)\b");
+   }
+
    /// <summary>
    /// Executes a single workflow step asynchronously within the provided execution context.
    /// </summary>
@@ -217,6 +269,8 @@ public sealed class HarmonyExecutor
          case ExtractInputStep s:
             foreach (var (varName, expr) in s.Output)
             {
+               if (!ValidateExpressionSyntax(expr))
+                  throw new InvalidOperationException($"Invalid expression syntax: {expr}");
                var value = ctx.EvalExpression(expr);
                ctx.Vars[varName] = value;
             }
@@ -232,6 +286,13 @@ public sealed class HarmonyExecutor
                var args = new KernelArguments();
                foreach (var (k, v) in s.Args)
                {
+                  if (v.ValueKind == JsonValueKind.String)
+                  {
+                     var expr = v.GetString() ?? string.Empty;
+                     if (expr.StartsWith("$") && !ValidateExpressionSyntax(expr))
+                        throw new InvalidOperationException($"Invalid argument expression: {expr}");
+                  }
+
                   args[k] = ctx.EvalNode(v);
                }
                
@@ -250,7 +311,11 @@ public sealed class HarmonyExecutor
 
          case IfStep s:
             {
+               if (!ValidateExpressionSyntax(s.Condition))
+                  throw new InvalidOperationException($"Invalid condition syntax: {s.Condition}");
+
                var condition = ctx.EvalBoolean(s.Condition);
+
                var branch = condition ? s.Then : s.Else;
                foreach (var inner in branch)
                {
@@ -262,42 +327,42 @@ public sealed class HarmonyExecutor
 
          case AssistantMessageStep s:
             {
-               // Validate channel (analysis - internal reasoning; never expose to end user)
-               IsAnalysisChannel(s.Channel ?? string.Empty);
+               var channelText = s.Channel ?? string.Empty;
+               var channelLower = channelText.ToLowerInvariant();
+
+               // Allowed HRF channels for assistant-message steps: analysis | final
+               if (channelLower != "analysis" && channelLower != "final")
+               {
+                  throw new InvalidOperationException(
+                     $"Invalid channel '{s.Channel}' for assistant-message step. " +
+                     "Expected 'analysis' or 'final'.");
+               }
 
                // Render content or template
                var text = !string.IsNullOrWhiteSpace(s.ContentTemplate)
                    ? ctx.RenderTemplate(s.ContentTemplate!)
                    : (s.Content ?? string.Empty);
 
-               if (s.Channel?.Equals("analysis", StringComparison.OrdinalIgnoreCase) == true)
+               if (channelLower == "analysis")
                {
-                  // Analysis is typically internal; we can keep it in history
+                  // Analysis is internal-only; do not surface to end user
                   if (!string.IsNullOrWhiteSpace(text))
                      ctx.Chat.AddAssistantMessage(text);
                   return false;
                }
 
-               if (s.Channel?.Equals("final", StringComparison.OrdinalIgnoreCase) == true)
+               // channelLower == "final"
+               if (!string.IsNullOrWhiteSpace(text) && text != ".")
                {
-                  if (!string.IsNullOrWhiteSpace(text) && text != ".")
-                  {
-                     // If template produced material text, use it directly
-                     ctx.FinalText = text;
-                     return false;
-                  }
-
-                  // Otherwise, ask LLM to produce final answer given the history
-                  var result = await ctx.ChatSvc.GetChatMessageContentsAsync(
-                     ctx.Chat, kernel: ctx.Kernel, cancellationToken: ct);
-                  ctx.FinalText = string.Join("\n", result.Select(r => r.Content));
+                  // If template produced material text, use it directly as final answer
+                  ctx.FinalText = text;
                   return false;
                }
 
-               // Any other channel -> append to chat
-               if (!string.IsNullOrWhiteSpace(text))
-                  ctx.Chat.AddAssistantMessage(text);
-
+               // Otherwise, ask LLM to produce final answer given the history
+               var result = await ctx.ChatSvc.GetChatMessageContentsAsync(
+                  ctx.Chat, kernel: ctx.Kernel, cancellationToken: ct);
+               ctx.FinalText = string.Join("\n", result.Select(r => r.Content));
                return false;
             }
 

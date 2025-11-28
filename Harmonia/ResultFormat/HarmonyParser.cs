@@ -16,7 +16,15 @@ namespace Harmonia.ResultFormat;
 /// follows a specific tokenized format, extracting messages and their associated metadata. 
 /// It supports parsing headers, message content, and termination tokens to construct a structured 
 /// representation of a conversation. This class is intended for use in scenarios where 
-/// conversations are represented in a predefined tokenized format.</remarks>
+/// conversations are represented in a predefined tokenized format.
+/// 
+/// This version preserves JSON content faithfully:
+/// - If a message is constrained with content type "json" or "harmony-script", the message body
+///   between &lt;|message|&gt; and the terminator is parsed as JSON and stored as a JsonElement
+///   with the original JSON structure.
+/// - For all other content types (or no content type), the message body is preserved as raw
+///   text and wrapped as a JSON string.
+/// </remarks>
 public class HarmonyParser
 {
 
@@ -49,19 +57,30 @@ public class HarmonyParser
    /// Parses a conversation from the specified text input, extracting messages and their 
    /// associated metadata.
    /// </summary>
-   /// <remarks>This method processes the input text to extract structured conversation data.
+   /// <remarks>
    /// Each message in the conversation includes metadata such as the role, channel, recipient, 
    /// content type, and termination type. The method expects the input text to follow a specific
-   /// tokenized format, and it will throw exceptions if the format is invalid.</remarks>
+   /// tokenized format, and it will throw exceptions if the format is invalid.
+   /// 
+   /// JSON preservation behavior:
+   /// - When the header includes <c>&lt;|constrain|&gt; json</c> or <c>harmony-script</c>, the
+   ///   message block is parsed as JSON and stored as a structured <see cref="JsonElement"/>.
+   /// - Otherwise, the message block is stored as a JSON string with the raw text preserved.
+   /// </remarks>
    /// <param name="text">The input text containing the conversation data to parse. 
    /// Must not be null, empty, or whitespace.</param>
-   /// <returns>A <see cref="HarmonyConversation"/> object containing the parsed messages and 
-   /// their metadata.</returns>
+   /// <returns>
+   /// A <see cref="HarmonyConversation"/> object containing the parsed messages and 
+   /// their metadata.
+   /// </returns>
    /// <exception cref="ArgumentException">Thrown if <paramref name="text"/> is null, empty, 
    /// or consists only of whitespace.</exception>
-   /// <exception cref="FormatException">Thrown if the input text is missing required tokens, 
-   /// such as <c>&lt;|message|&gt;</c> or a valid terminator token 
-   /// (<c>&lt;|end|&gt;</c>, <c>&lt;|call|&gt;</c>, or <c>&lt;|return|&gt;</c>).</exception>
+   /// <exception cref="FormatException">
+   /// Thrown if the input text is missing required tokens, 
+   /// such as &lt;|message|&gt; or a valid terminator token 
+   /// (&lt;|end|&gt;, &lt;|call|&gt;, or &lt;|return|&gt;), or if a message
+   /// constrained as JSON contains invalid JSON.
+   /// </exception>
    public HarmonyConversation ParseConversation(string text)
    {
       if (string.IsNullOrWhiteSpace(text))
@@ -84,18 +103,22 @@ public class HarmonyParser
          int contentStart = msgIdx + HarmonyTokens.Message.Length;
 
          // Read content until any of the terminators
-         var (content, termToken, nextPosAfterContent) = 
+         var (contentRaw, termToken, nextPosAfterContent) = 
             ReadUntilAny(text, contentStart, AfterMessageTerminators);
          if (termToken is null)
             throw new FormatException("Missing terminator token (<|end|>|<|call|>|<|return|>)");
 
+         // Preserve JSON or text according to contentType
+         var contentElement = ParseContentElement(contentRaw, contentType);
+
+         // Create message
          var message = new HarmonyMessage
          {
             Role = role,
-            Channel = channel.Value,
+            Channel = channel.Value,  // existing behavior: assumes channel present for these flows
             Recipient = recipient,
             ContentType = contentType,
-            Content = JsonSerializer.SerializeToElement(content),
+            Content = contentElement,
             Termination = termToken switch
             {
                var t when t == HarmonyTokens.End => HarmonyTermination.End,
@@ -198,7 +221,8 @@ public class HarmonyParser
    ///          </description></item> 
    ///    </list>
    /// </returns>
-   /// <exception cref="FormatException">Thrown if the channel specified in the header text is unrecognized.</exception>
+   /// <exception cref="FormatException">Thrown if the channel specified in the header text is
+   /// unrecognized.</exception>
    private static (HarmonyChannel?, string?) ParseChannelAndRecipient(string headerText)
    {
       // Example headerText: "commentary to=functions.getweather"
@@ -297,6 +321,46 @@ public class HarmonyParser
          return (text.Substring(start), null, text.Length);
       }
       return (text.Substring(start, bestIdx - start), which, bestIdx);
+   }
+
+   /// <summary>
+   /// Converts a raw message body string into a <see cref="JsonElement"/> according to the
+   /// message content type.
+   /// </summary>
+   /// <remarks>
+   /// - If <paramref name="contentType"/> is "json" or "harmony-script" (case-insensitive),
+   ///   the raw body is parsed as JSON, preserving the JSON structure.
+   /// - Otherwise, the raw body is preserved exactly as text and wrapped as a JSON string.
+   /// </remarks>
+   /// <param name="rawContent">The raw text between &lt;|message|&gt; and the terminator.</param>
+   /// <param name="contentType">The content type specified in the header, if any.</param>
+   /// <returns>A <see cref="JsonElement"/> representing either structured JSON or a JSON string.
+   /// </returns>
+   /// <exception cref="FormatException">
+   /// Thrown if the content is marked as JSON but is not valid JSON.
+   /// </exception>
+   private static JsonElement ParseContentElement(string rawContent, string? contentType)
+   {
+      if (!string.IsNullOrWhiteSpace(contentType) &&
+          (contentType.Equals("json", StringComparison.OrdinalIgnoreCase) ||
+           contentType.Equals("harmony-script", StringComparison.OrdinalIgnoreCase)))
+      {
+         try
+         {
+            // Parse as JSON; this preserves the data shape (object/array/primitive)
+            using var doc = JsonDocument.Parse(rawContent);
+            return doc.RootElement.Clone();
+         }
+         catch (JsonException ex)
+         {
+            throw new FormatException(
+               $"Content for contentType='{contentType}' is not valid JSON.", ex);
+         }
+      }
+
+      // For all other content types (or none), treat the body as plain text and
+      // preserve it exactly as given, wrapped as a JSON string.
+      return JsonSerializer.SerializeToElement(rawContent);
    }
 
 }

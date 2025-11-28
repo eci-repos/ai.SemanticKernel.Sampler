@@ -33,7 +33,7 @@ public class HarmoniaFoodExecutor
 
       // Parse the Harmony message
       string json = File.ReadAllText("Scripts/" + jsonScriptFileName);
-      var envelope = HarmonyEnvelope.Parse(json);
+      var envelope = HarmonyEnvelope.Deserialize(json);
 
       // Provide user input for extract-input step
       var input = new Dictionary<string, object?>
